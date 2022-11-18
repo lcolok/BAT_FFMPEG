@@ -1,7 +1,8 @@
 @echo off
 SET outputDir=%~dp1_hflipped
-md "%outputDir%"
+@REM md "%outputDir%"
 for %%i in (%*) do (
-    ffmpeg -i %%i -vf "hflip" "%outputDir%\%%~ni_hflip.png" -y
+    @REM ffmpeg -i %%i -vf "hflip" "%outputDir%\%%~ni_hflip.png" -y
+    ffmpeg -i %%i -vf "hflip" "%%~ni_hflip.png" -y
 )
 @REM pause
