@@ -4,4 +4,4 @@ md "%outputDir%"
 for %%i in (%*) do (
     ffmpeg -i %%i -y "%outputDir%\%%~ni.png"
 )
-pause
+@REM pause
