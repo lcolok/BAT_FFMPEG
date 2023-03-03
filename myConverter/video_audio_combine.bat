@@ -2,5 +2,5 @@
 @echo off
 echo %1
 echo %2
-ffmpeg -i %1 -i %2 -vcodec copy -acodec copy %~n1(combined).mp4
+ffmpeg -i "%~1" -i "%~2" -vcodec copy -acodec copy "%~dp1%~n1(combined).mp4"
 pause

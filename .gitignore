@@ -5,3 +5,6 @@
 !.gitignore
 !*.conf
 !index.html
+
+goConverter/json2txt/json
+goConverter/json2txt/txt
