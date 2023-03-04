@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/atotto/clipboard"
 )
@@ -20,7 +22,11 @@ func main() {
 
 	pngFiles := getPNGFiles(inputDir)
 
-	startFrame, frameRate := parsePNGFiles(pngFiles)
+	startFrame, _ := parsePNGFiles(pngFiles)
+
+	defaultFrameRate := 30
+
+	frameRate := getUserFrameRate(defaultFrameRate)
 
 	numDigits := getNumDigits(pngFiles)
 
@@ -28,6 +34,29 @@ func main() {
 	buildFFmpegCommand(inputDir, startFrame, frameRate, numDigits, outputPath, pngFiles)
 
 	fmt.Printf("输出文件已保存为 %s\n", outputPath)
+}
+
+func getUserFrameRate(defaultFrameRate int) int {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("请输入帧速率（默认为30）：")
+	frameRateString, err := reader.ReadString('\n')
+	if err != nil {
+		fmt.Println("读取帧速率错误：", err)
+		os.Exit(1)
+	}
+	frameRateString = strings.TrimSpace(frameRateString)
+
+	var frameRate int
+	if frameRateString == "" {
+		frameRate = defaultFrameRate
+	} else {
+		frameRate, err = strconv.Atoi(frameRateString)
+		if err != nil {
+			fmt.Println("帧速率格式错误：", err)
+			os.Exit(1)
+		}
+	}
+	return frameRate
 }
 
 func getInputDir() string {
