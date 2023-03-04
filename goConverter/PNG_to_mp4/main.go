@@ -12,67 +12,61 @@ import (
 )
 
 func main() {
-	var inputDir string
+	inputDir := getInputDir()
 
-	// 检查是否有命令行参数传递进来
+	validateInputDir(inputDir)
+
+	parentDir := getParentDir(inputDir)
+
+	pngFiles := getPNGFiles(inputDir)
+
+	startFrame, frameRate := parsePNGFiles(pngFiles)
+
+	numDigits := getNumDigits(pngFiles)
+
+	outputPath := filepath.Join(parentDir, "output.mp4")
+	buildFFmpegCommand(inputDir, startFrame, frameRate, numDigits, outputPath, pngFiles)
+
+	fmt.Printf("输出文件已保存为 %s\n", outputPath)
+}
+
+func getInputDir() string {
 	if len(os.Args) > 1 {
-		// 如果有，尝试将其作为输入目录路径
-		inputDir = os.Args[1]
-	} else {
-		// 否则，从剪贴板中获取输入目录
-		inputDirFromClipboard, err := clipboard.ReadAll()
-		if err != nil {
-			panic(err)
-		}
-		inputDir = inputDirFromClipboard
+		return os.Args[1]
 	}
 
-	// 如果没有输入目录，尝试从拖放的文件夹中获取
-	if inputDir == "" && len(os.Args) == 1 {
-		if len(os.Args) == 1 {
-			// 获取文件所在目录
-			execPath, _ := filepath.Abs(filepath.Dir(os.Args[0]))
-
-			if filepath.Ext(execPath) == ".exe" {
-				// 如果是.exe文件，则尝试获取拖入的文件夹路径
-				if len(os.Args) > 1 {
-					inputDir = os.Args[1]
-				} else {
-					// 如果没有命令行参数，提示用户将文件夹拖入.exe文件上
-					fmt.Println("请将文件夹拖入此可执行文件上以继续")
-					return
-				}
-			} else {
-				// 如果是.go文件，则尝试获取拖入的文件夹路径
-				if len(os.Args) > 2 {
-					inputDir = os.Args[2]
-				} else {
-					// 如果没有命令行参数，提示用户将文件夹拖入.exe文件上
-					fmt.Println("请将文件夹拖入此可执行文件上以继续")
-					return
-				}
-			}
-			inputDir = filepath.Clean(inputDir)
-		}
+	inputDirFromClipboard, err := clipboard.ReadAll()
+	if err != nil {
+		panic(err)
 	}
 
-	// 检查输入目录是否是一个合法的目录路径
+	return inputDirFromClipboard
+}
+
+func validateInputDir(inputDir string) {
 	fileInfo, err := os.Stat(inputDir)
 	if os.IsNotExist(err) || !fileInfo.IsDir() {
 		panic("输入目录不存在或不是一个目录路径")
 	}
+}
 
-	// 获取输入目录的父级目录路径
-	parentDir := filepath.Dir(inputDir)
+func getParentDir(inputDir string) string {
+	return filepath.Dir(inputDir)
+}
 
-	// 获取输入目录中的所有PNG文件名
+func getPNGFiles(inputDir string) []string {
 	pattern := filepath.Join(inputDir, "*.png")
 	pngFiles, err := filepath.Glob(pattern)
 	if err != nil {
 		panic(err)
 	}
+	if len(pngFiles) == 0 {
+		panic("未找到PNG文件")
+	}
+	return pngFiles
+}
 
-	// 解析文件名以确定文件名规律
+func parsePNGFiles(pngFiles []string) (int, int) {
 	re := regexp.MustCompile(`(\d+)\.png$`)
 	var startFrame int
 	var frameRate int
@@ -89,15 +83,14 @@ func main() {
 			frameRate++
 		}
 	}
-	if frameRate == 0 {
-		panic("未找到PNG文件")
-	}
+	return startFrame, frameRate
+}
 
-	// 解析文件名以确定数字的位数
-	re2 := regexp.MustCompile(`(\d+)\.png$`)
+func getNumDigits(pngFiles []string) int {
+	re := regexp.MustCompile(`(\d+)\.png$`)
 	var numDigits int
 	for _, filename := range pngFiles {
-		matches := re2.FindStringSubmatch(filename)
+		matches := re.FindStringSubmatch(filename)
 		if matches != nil {
 			num := len(matches[1])
 			if numDigits == 0 || num > numDigits {
@@ -105,27 +98,38 @@ func main() {
 			}
 		}
 	}
-	if numDigits == 0 {
-		panic("未找到PNG文件")
-	}
+	return numDigits
+}
 
-	// 使用解析出的文件名规律构建FFmpeg命令行参数
-	args := []string{
-		"-start_number", strconv.Itoa(startFrame),
-		"-framerate", strconv.Itoa(frameRate),
-		"-i", inputDir + "/" + re.ReplaceAllString(filepath.Base(pngFiles[0]), fmt.Sprintf("%%%dd.png", numDigits)),
-		"-c:v", "libx264", "-y",
-		filepath.Join(parentDir, "output.mp4"),
+func buildFFmpegCommand(inputDir string, startFrame, frameRate, numDigits int, outputPath string, pngFiles []string) {
+	// 通过正则表达式匹配文件名以确定文件名规律
+	fileNameRegex := regexp.MustCompile(`(\d+)\.png$`)
+	// 生成FFmpeg命令的参数
+	// 获取PNG文件的基础名称（不带目录路径和文件扩展名）
+	baseName := filepath.Base(pngFiles[0])
+	// 用正则表达式替换基础文件名中的数字以生成文件名格式字符串
+	baseName = fileNameRegex.ReplaceAllString(baseName, fmt.Sprintf("%%%dd.png", numDigits))
+	// 组合输入目录和格式化的文件名以生成输入路径
+	inputPath := filepath.Join(inputDir, baseName)
+	// 生成FFmpeg命令的参数
+	ffmpegArgs := []string{
+		"-start_number", strconv.Itoa(startFrame), // 设置开始帧数
+		"-framerate", strconv.Itoa(frameRate), // 设置帧率
+		"-i", inputPath, // 设置输入路径
+		"-c:v", "libx264", // 设置视频编解码器为libx264
+		"-y",       // 允许覆盖输出文件
+		outputPath, // 设置输出路径
 	}
-
+	// 创建一个FFmpeg命令对象
+	ffmpegCmd := exec.Command("ffmpeg", ffmpegArgs...)
+	// 将输出和错误输出流重定向到标准输出和标准错误输出流
+	ffmpegCmd.Stdout = os.Stdout
+	ffmpegCmd.Stderr = os.Stderr
+	// 设置FFmpeg命令执行的工作目录
+	ffmpegCmd.Dir = inputDir
 	// 执行FFmpeg命令
-	cmd := exec.Command("ffmpeg", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err = cmd.Run()
-	if err != nil {
+	if err := ffmpegCmd.Run(); err != nil {
+		// 如果出现错误，则中止程序
 		panic(err)
 	}
-
-	fmt.Printf("输出文件已保存为 %s\n", filepath.Join(parentDir, "output.mp4"))
 }
