@@ -30,7 +30,8 @@ func main() {
 
 	numDigits := getNumDigits(pngFiles)
 
-	outputPath := filepath.Join(parentDir, "output.mp4")
+	outputPath := filepath.Join(parentDir, strings.ReplaceAll(filepath.Base(inputDir), "_", " ")+".mp4")
+
 	buildFFmpegCommand(inputDir, startFrame, frameRate, numDigits, outputPath, pngFiles)
 
 	fmt.Printf("输出文件已保存为 %s\n", outputPath)
